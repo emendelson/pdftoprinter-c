@@ -5,10 +5,10 @@ printer. It renders pages with [PDFium](https://pdfium.googlesource.com/pdfium/)
 and prints them through a GDI printer device context, so it needs **no external
 PDF viewer**.
 
-This is a native C rewrite of the long-standing AutoIt-based `PDFtoPrinter.exe`.
-Besides being self-contained, it adds page-layout control and the ability to
-**specify the printer's paper tray according to each PDF page's size**, 
-something otherwise found mainly in Adobe Acrobat and PDF-XChange (and
+This is a native C rewrite (by Claude Code) of the long-standing AutoIt-based
+`PDFtoPrinter.exe`. Besides being self-contained, it adds page-layout control
+and the ability to **specify the printer's paper tray according to a PDF page's 
+size**, something otherwise found mainly in Adobe Acrobat and PDF-XChange (and
 implemented in the AutoIt version through the settings of the included
 PDF-XChange Viewer, which is not in this new C version).
 
