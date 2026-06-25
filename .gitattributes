@@ -1,0 +1,11 @@
+# Make line endings deterministic regardless of each user's core.autocrlf.
+# Source and text files use LF; Windows batch files use CRLF; binaries are
+# never touched.
+
+* text=auto eol=lf
+
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+*.ico  binary
+*.pdf  binary

@@ -1,0 +1,6 @@
+// Application icon. ID 1 (lowest) is what Explorer shows for the EXE.
+1 ICON "PDFtoPrinter.ico"
+
+// Application manifest (type 24 = RT_MANIFEST, id 1 = CREATEPROCESS_MANIFEST_RESOURCE_ID).
+// asInvoker + supportedOS list suppresses the PCA "did this program run correctly?" dialog.
+1 24 "PDFtoPrinter.manifest"

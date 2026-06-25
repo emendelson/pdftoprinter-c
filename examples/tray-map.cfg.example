@@ -1,0 +1,27 @@
+# Example PDFtoPrinter settings / tray-map file.
+#
+# A settings file is auto-loaded if named "settings.cfg" next to the EXE, or
+# loaded on demand with /settings=thisfile.cfg. Each non-comment line is one
+# command-line option WITHOUT the leading slash. Lines starting with # or ;
+# are comments.
+#
+# Below: a per-printer "choose tray by PDF page size" map. The numbers are the
+# printer's own paper-source (bin) numbers -- discover them by running:
+#
+#     PDFtoPrinterNative.exe /listtrays "Your Printer Name"
+#
+# Bin numbers are NOT portable between printers, so this file is per-printer.
+
+# Optional: pin a printer for this profile (a line that isn't a known option
+# is treated as the printer name).
+Your Printer Name
+
+# Map paper sizes to bins (example numbers shown):
+tray letter=259
+tray legal=258
+tray a4=257
+
+# Known size names: letter legal a4 a3 a5 tabloid executive statement folio b5 a6
+
+# Alternative to an explicit map: let the printer pick the tray by size itself.
+# autotray
