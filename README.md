@@ -28,10 +28,6 @@ PDF-XChange Viewer, which is not in this new C version).
 - Settings files (`settings.cfg` / `/settings=`), CSV logging (`/csv`),
   dry-run preview (`/mock`).
 
-## Binaries
-
-Codesigned binaries and the required dll are downloadable from the Code list.
-
 ## Building
 
 Requirements: **Visual Studio 2022** with the C++ workload, on **Windows 10 or
