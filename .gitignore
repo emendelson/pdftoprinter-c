@@ -1,5 +1,5 @@
 # Build artifacts
-*.exe
+# *.exe
 *.obj
 *.res
 *.pdb
@@ -7,7 +7,7 @@
 preview.bmp
 
 # Bundled at build time (copied from the PDFium SDK)
-pdfium.dll
+# pdfium.dll
 
 # Downloaded PDFium prebuilt SDK
 /pdfium/
