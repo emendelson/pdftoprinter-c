@@ -24,6 +24,7 @@
 #include <math.h>
 
 #include "fpdfview.h"
+#include "fpdf_edit.h"      /* FPDF_PRINTMODE_* for FPDF_SetPrintMode */
 
 /* ----- Exit codes (mirror the AutoIt version where meaningful) ----------- */
 #define EXIT_OK             0
@@ -46,6 +47,16 @@ static int g_wroteOutput = 0;
 #define wprintf(...)     (g_wroteOutput = 1, wprintf(__VA_ARGS__))
 #define fwprintf(f, ...) (((f) == stdout || (f) == stderr) ? (g_wroteOutput = 1) : 0, \
                           fwprintf(f, __VA_ARGS__))
+
+/* ----- Render model (/render=bitmap|ps|ps42) ----------------------------- */
+/* bitmap: original behaviour - full-page raster via StretchDIBits.
+   ps:     PDFium emits PostScript level 3 inside the driver's own job, so the
+           driver still writes the job header (finishing etc.). Needs a
+           PostScript driver; falls back to bitmap if the driver lacks support.
+   ps42:   as ps, but embedded CID TrueType fonts go as Type 42.
+   (There is no gdi/EMF mode: PDFium rounds GDI paths to whole device pixels,
+   which prints thin glyph stems and periods visibly too heavy.) */
+enum { RENDER_BITMAP = 0, RENDER_PS = 1, RENDER_PS42 = 2 };
 
 /* ----- Scaling model ----------------------------------------------------- */
 enum { SCALE_FLAGS = 0, SCALE_PERCENT = 1 };
@@ -77,6 +88,7 @@ typedef struct {
     int      trayExplicit;           /* user named a tray option -> be verbose */
     struct { wchar_t name[32]; int bin; } traymap[32];  /* tray <size>=<bin> */
     int      traymapCount;
+    int      renderMode;             /* RENDER_BITMAP (default) | PS | PS42  */
 } options;
 
 /* ----- Simple growable vector of wide strings ---------------------------- */
@@ -367,6 +379,16 @@ static void apply_arg(options *o, const wchar_t *arg, int fromConfig,
     if (optprefix(arg, L"tray"))     return;           /* any other tray* -> ignore */
 
     if (optmatch(arg, L"listtrays")) { o->listtrays = 1; return; }
+    if ((rest = optprefix(arg, L"render="))) {
+        if      (_wcsicmp(rest, L"ps")  == 0 || _wcsicmp(rest, L"postscript") == 0) o->renderMode = RENDER_PS;
+        else if (_wcsicmp(rest, L"ps42") == 0) o->renderMode = RENDER_PS42;
+        else {
+            if (_wcsicmp(rest, L"bitmap") != 0)
+                fwprintf(stderr, L"Warning: unknown /render=%s; using bitmap.\n", rest);
+            o->renderMode = RENDER_BITMAP;
+        }
+        return;
+    }
 
     if (optmatch(arg, L"shrink-to-fit")) { o->shrink = 1; return; }
     if (optmatch(arg, L"expand-to-fit")) { o->expand = 1; return; }
@@ -663,6 +685,21 @@ static int print_page(HDC hdc, DEVMODEW *dm, FPDF_DOCUMENT doc, int pageIndex, c
     int x = o->autocenter ? (prW - tw) / 2 : 0;
     int y = o->autocenter ? (prH - th) / 2 : 0;
 
+    if (o->renderMode != RENDER_BITMAP) {
+        /* PostScript: PDFium renders into the printer DC, which emits PS via
+           the PASSTHROUGH escape (FPDF_SetPrintMode chose the PS level). */
+        FPDF_PAGE vpage = FPDF_LoadPage(doc, pageIndex);
+        if (!vpage) return 0;
+        int vok = 1;
+        if (StartPage(hdc) <= 0) vok = 0;
+        if (vok) {
+            FPDF_RenderPage(hdc, vpage, x, y, tw, th, rotate, FPDF_PRINTING | FPDF_ANNOT);
+            if (EndPage(hdc) <= 0) vok = 0;
+        }
+        FPDF_ClosePage(vpage);
+        return vok;
+    }
+
     size_t stride = (size_t)tw * 4;
     unsigned char *buf = (unsigned char*)malloc(stride * th);
     if (!buf) return 0;
@@ -871,7 +908,12 @@ L"               [/csv] [/mock] [/s]\n"
 L"               [/scale=#|fit] [/shrink-to-fit] [/expand-to-fit]\n"
 L"               [/auto-rotate] [/auto-center] [/portrait] [/landscape]\n"
 L"               [/duplex|/duplex=short] [/simplex] [/tray=#] [/no-autotray]\n"
-L"               [/outfile=path] [/settings=profile.cfg] [/listtrays]\n\n"
+L"               [/outfile=path] [/settings=profile.cfg] [/listtrays]\n"
+L"               [/render=bitmap|ps|ps42]\n\n"
+L"Rendering: bitmap (default) sends a full-page raster. ps sends PostScript\n"
+L"  inside the driver's job (PS drivers only; falls back to bitmap); ps42\n"
+L"  also sends embedded CID TrueType fonts as Type 42. Queue defaults apply\n"
+L"  in all modes.\n\n"
 L"Wildcards (* ?) and relative paths are OK. Multiple named files override a\n"
 L"wildcard. Default printer is used unless a printer name is given.\n\n"
 L"Page ranges: 3 | 2-4,6,8-9 | 8- | z-1 (reverse) | z-1:odd|even | r5-r2.\n\n"
@@ -1175,6 +1217,9 @@ L"the bin numbers and names for a printer.\r\n\r\n"
 L"Other options: /r recurses the current folder; /R# recurses # levels; /p:password opens an "
 L"encrypted PDF; /csv writes a list of files printed; /mock lists files without printing; "
 L"/s runs silently; /outfile=path prints to a file.\r\n\r\n"
+L"Rendering: /render=bitmap (the default) sends each page as a full-page image. /render=ps "
+L"sends PostScript inside the driver's job (PostScript drivers only; otherwise it falls back "
+L"to bitmap), and /render=ps42 also sends embedded CID TrueType fonts as Type 42.\r\n\r\n"
 L"Settings files: settings.cfg next to the program loads automatically; /settings=file.cfg "
 L"loads another. Each line is one option without the leading slash; lines starting with # or "
 L"; are comments.";
@@ -1319,6 +1364,19 @@ int wmain(int argc, wchar_t **argv) {
             fwprintf(stderr, L"Could not open printer \"%s\".\n", printerName);
             FPDF_DestroyLibrary();
             return EXIT_PRINTER_INVALID;
+        }
+        if (o.renderMode == RENDER_PS || o.renderMode == RENDER_PS42) {
+            /* PostScript needs a PS driver that accepts the PASSTHROUGH escape.
+               If it doesn't (PCL, XPS/v4, IPP class driver), fall back to bitmap. */
+            int esc = PASSTHROUGH;
+            if (ExtEscape(hdc, QUERYESCSUPPORT, sizeof(esc), (LPCSTR)&esc, 0, NULL) > 0) {
+                FPDF_SetPrintMode(o.renderMode == RENDER_PS42
+                                  ? FPDF_PRINTMODE_POSTSCRIPT3_TYPE42_PASSTHROUGH
+                                  : FPDF_PRINTMODE_POSTSCRIPT3_PASSTHROUGH);
+            } else {
+                fwprintf(stderr, L"Warning: \"%s\" does not accept PostScript; using /render=bitmap.\n", printerName);
+                o.renderMode = RENDER_BITMAP;
+            }
         }
     }
 
