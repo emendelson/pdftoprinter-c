@@ -37,11 +37,22 @@ later** (the build uses the built-in `curl` and `tar`).
 build.bat
 ```
 
-On the first run, `build.bat` downloads the prebuilt PDFium SDK from
-[bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries) into a
-`pdfium\` folder, then compiles. The output is `PDFtoPrinterNative.exe` plus
-`pdfium.dll` (which must sit next to the EXE), and two renamed copies
-(`PDFtoPrinterSelect.exe`, `PDFtoPrinterSelectGUI.exe`).
+On the first run, `build.bat` downloads a pinned release of the prebuilt PDFium
+SDK from [bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries)
+into a `pdfium\` folder, checks its SHA-256, then compiles. To upgrade PDFium,
+change `PDFIUM_BUILD` and `PDFIUM_SHA256` at the top of `build.bat`. The output
+is `PDFtoPrinterNative.exe` plus `pdfium.dll` (which must sit next to the EXE),
+and three renamed copies (`PDFtoPrinter.exe`, `PDFtoPrinterSelect.exe`,
+`PDFtoPrinterSelectGUI.exe`).
+
+Local builds are versioned `0.0.0-dev`. The GitHub Actions workflow
+(`.github/workflows/build.yml`) builds on `windows-latest`, versions the EXE
+from the latest `vX.Y.Z` tag with [MinVer](https://github.com/adamralph/minver)
+(three-part tags only; `v1.1` is ignored), and checks that it compiles on pushes and pull requests. To get a
+downloadable artifact (the EXEs and `pdfium.dll`), run it from the Actions tab;
+enter a PR number there to build that pull request. Pushing a `vX.Y.Z` tag
+(e.g. `v1.2.0`, or `v1.2.0-beta.1` for a pre-release) publishes a GitHub
+Release with the build attached.
 
 `run-test.bat` runs a few non-interactive smoke tests (run it from a normal
 Command Prompt, not Git Bash).
