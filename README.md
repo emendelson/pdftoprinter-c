@@ -51,7 +51,7 @@ Command Prompt, not Git Bash).
 ```
 PDFtoPrinter [path\]file.pdf [more.pdf ...] ["printer name"] [pages=...]
              [copies=#] [focus="title"] [/r] [/R[#]] [/p:password]
-             [/csv] [/mock] [/s]
+             [/csv] [/mock] [/s] [/jobname="name"]
              [/scale=#|fit] [/shrink-to-fit] [/expand-to-fit]
              [/auto-rotate] [/auto-center] [/portrait] [/landscape]
              [/duplex|/duplex=short] [/simplex] [/tray=#] [/autotray]
@@ -64,6 +64,9 @@ PDFtoPrinter [path\]file.pdf [more.pdf ...] ["printer name"] [pages=...]
 - `/scale=#` is an explicit percentage and overrides the fit options.
   `/shrink-to-fit` shrinks oversized pages, `/expand-to-fit` enlarges small
   pages, and using both fits either way.
+- `/jobname="name"` sets the job name shown in the print queue (default: the
+  PDF's file name). `{file}` in the name inserts the file name, so
+  `/jobname="Batch 42 - {file}"` keeps several PDFs apart.
 - `/mock` lists what would print (and the per-page tray decisions) without
   printing. `/s` runs silently. `/outfile=path` prints to a file.
 

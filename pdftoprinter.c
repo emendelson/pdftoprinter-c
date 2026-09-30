@@ -59,6 +59,7 @@ typedef struct {
     wchar_t  focus[512];
     wchar_t  mydir[MAX_PATH];        /* CSV output folder base               */
     wchar_t  outfile[MAX_PATH];      /* print-to-file / port redirect        */
+    wchar_t  jobname[256];           /* spooler job name; {file} = PDF name  */
     wchar_t  password[256];
     int      recur;                  /* 1=this folder, 0=unlimited, -n=depth */
     int      csv, mock, silent, debug;
@@ -301,6 +302,15 @@ static void apply_arg(options *o, const wchar_t *arg, int fromConfig,
                       WideVec *fileArgs) {
     const wchar_t *rest;
 
+    /* Before the .pdf test, so /jobname=report.pdf is not taken as a file.
+       Settings-file lines keep their quotes, so strip a surrounding pair. */
+    if ((rest = optprefix(arg, L"jobname="))) {
+        size_t n = wcslen(rest);
+        if (n >= 2 && rest[0] == L'"' && rest[n - 1] == L'"') { rest++; n -= 2; }
+        if (n > 255) n = 255;
+        wcsncpy(o->jobname, rest, n); o->jobname[n] = 0;
+        return;
+    }
     if (ends_with_pdf(arg)) {
         if (!fromConfig) wv_push(fileArgs, arg);   /* config holds how, not what */
         return;
@@ -779,9 +789,20 @@ static void print_file(HDC hdc, DEVMODEW *dm, const wchar_t *path, int index, co
     }
 
     /* ----- print -------------------------------------------------------- */
+    /* Job name: the PDF's file name, or /jobname= with {file} replaced by it. */
+    wchar_t docname[512]; size_t dn = 0;
+    const wchar_t *jp = o->jobname[0] ? o->jobname : L"{file}";
+    while (*jp && dn < 511) {
+        if (_wcsnicmp(jp, L"{file}", 6) == 0) {
+            for (const wchar_t *f = row->filename; *f && dn < 511; f++) docname[dn++] = *f;
+            jp += 6;
+        } else docname[dn++] = *jp++;
+    }
+    docname[dn] = 0;
+
     DOCINFOW di; ZeroMemory(&di, sizeof(di));
     di.cbSize = sizeof(di);
-    di.lpszDocName = row->filename;
+    di.lpszDocName = docname;
     di.lpszOutput  = o->outfile[0] ? o->outfile : NULL;
 
     int ok = 1;
@@ -867,7 +888,7 @@ L"PDFtoPrinter (native) - v1\n\n"
 L"Usage:\n"
 L"  PDFtoPrinter [path\\]file.pdf [more.pdf ...] [\"printer name\"] [pages=...]\n"
 L"               [copies=#] [focus=\"title\"] [/r] [/R[#]] [/p:password]\n"
-L"               [/csv] [/mock] [/s]\n"
+L"               [/csv] [/mock] [/s] [/jobname=\"name\"]\n"
 L"               [/scale=#|fit] [/shrink-to-fit] [/expand-to-fit]\n"
 L"               [/auto-rotate] [/auto-center] [/portrait] [/landscape]\n"
 L"               [/duplex|/duplex=short] [/simplex] [/tray=#] [/no-autotray]\n"
@@ -884,6 +905,8 @@ L"  the printer's 'Automatically Select' bin. /tray=# picks one bin for the\n"
 L"  whole job, and a per-printer 'tray <size>=#' config map assigns bins by\n"
 L"  size. Run /listtrays (optionally with a printer name) to list a printer's\n"
 L"  bin numbers and names.\n\n"
+L"Job name: /jobname=\"name\" sets the name shown in the print queue; {file}\n"
+L"  inserts the PDF's file name (the default name).\n\n"
 L"settings.cfg next to the EXE is auto-loaded; /settings=file selects another.\n"
 L"Config lines are options minus the leading slash; # or ; comments.\n");
 }
@@ -1172,6 +1195,8 @@ L"that printer's \"Automatically Select\" bin. /tray=# selects a single paper bi
 L"job, and a per-printer settings file with \"tray <size>=#\" lines (for example tray "
 L"legal=258) assigns bins by page size. Run /listtrays (optionally with a printer name) to see "
 L"the bin numbers and names for a printer.\r\n\r\n"
+L"Job name: /jobname=\"name\" sets the name shown in the print queue. {file} in the name "
+L"inserts the PDF's file name, which is the name used by default.\r\n\r\n"
 L"Other options: /r recurses the current folder; /R# recurses # levels; /p:password opens an "
 L"encrypted PDF; /csv writes a list of files printed; /mock lists files without printing; "
 L"/s runs silently; /outfile=path prints to a file.\r\n\r\n"
